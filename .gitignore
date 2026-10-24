@@ -1,0 +1,18 @@
+# Virtualenv
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Data — fixtures shared separately, keep the folder structure only
+data/*
+!data/.gitkeep
