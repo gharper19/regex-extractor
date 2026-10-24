@@ -16,3 +16,10 @@ __pycache__/
 # Data — fixtures shared separately, keep the folder structure only
 data/*
 !data/.gitkeep
+!data/input_data
+data/input_data/*
+!data/input_data/.gitkeep
+
+# Archives
+*.zip
+*.tar.gz
