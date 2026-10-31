@@ -1,0 +1,23 @@
+{
+  "input": "examples/hosts.txt",
+  "output": "data/output_data/hosts.csv",
+  "patterns": {
+    "1": "(?m)^==[ \\t]*(?P<TARGET>(?P<HOST>[^\\n]+?))[ \\t]*(?:\\n|$)",
+    "2": "(?m)^--[ \\t]*(?P<TARGET>(?P<SERVICE>[^\\n]+?))[ \\t]*(?:\\n|$)",
+    "3": "(?m)^\\*[ \\t]*(?P<TARGET>(?P<TIMESTAMP>[0-9-]+ [0-9:]+))[ \\t]+(?P<SEVERITY>[A-Z]+)[ \\t]+(?P<MESSAGE>[^\\n]*?)[ \\t]*(?:\\n|$)"
+  },
+  "schema": {
+    "columns": [
+      "TIMESTAMP",
+      "SEVERITY",
+      "HOST",
+      "SERVICE",
+      "MESSAGE"
+    ],
+    "text": [
+      "HOST",
+      "SERVICE",
+      "MESSAGE"
+    ]
+  }
+}

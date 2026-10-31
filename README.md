@@ -1,87 +1,222 @@
-regex-extractor: a tool for extracting data fields in heirarchical tree structure via regex and exporting that flattened tree data to csv for data analysis.
+# regex-extractor
 
-## Impementation
-```
-flag ignore_failed_matches
+Extracts data fields from a hierarchical text file using one regex per level, then flattens
+the tree into a CSV for analysis.
 
-### Handling failed matches
-def parse_final_level(text:str, pattern:str, starting_level:int, regex_pattern_dict:dict, parent_csv):
-# outputs list of csv objects ready to be converted into rows, extracted from text using regex provided
-	So we are in the final level, we check our first match: 
-		is there no matches, return null. On the layer above, check for a level to return null and output that as a list with an empty csv row item with Status Failed Matched and title “No Matches Found”
-		Is there text data before it? Make that text a row with status Failed Match.
-		Is there text between the end of the span and the next match / or the end of the text-if no addl matches exists? capture that as a row with status failed match
-	take current match and parse groups for data. Leave data fields Null when not extracted successfully. 
-	*All csv rows have the following fields populated
-		- match_Index: <index in regex match list> 
-		- match_level: <Hierarchical level>
-		- csv_row_index: <row index in csv> 
-		- status: <Matched, Failed, Parent>
-		- parent: <Higher Level Parent id (level, match_Index)> 
-		- parent_match_text: <pattern matched text retrieved from parent regex>
-		- ancestor_dict: {
-				<level>: (<Ancestor ID(level, match_index)>, <Ancestor Match Text>)
-		- inherited_fields_dict: {		# Contains all fields extracted from ancestors, including most recent parent. Maintains group fields extracted from parents to be included in child object
-				<group_name>:<Extracted_Value>} 
-		- span: <start and end indicies in the text>
-		- match_text: <regex text matching pattern> 
-		* One of each of the group fields provided in regex pattern
-		* One of each of the group fields extracted from each ancestor from each hierarchal level
+You supply a **regex hierarchy** — one pattern per nesting level. Each row in the output
+inherits the fields captured by its ancestors, so the flat CSV keeps the context the
+indentation used to carry.
 
-def parse_heirarchy(text:str, pattern:str, starting_level:int, regex_pattern_dict:dict, parent_csv_object): # Here recent parent is the CsvRow Object that contains all the data we need to populate the children. If we have to go a level deeper, then w
-# outputs list of csv Rows ready to be 
-	# first validate that the starting_level value exists in the regex_pattern_dict. If not, Return a list containing a single Generic Error CSVRow Object describing the error. 
-	
-	# We are checking a generic level, We check our first match:
-	is this the last level? 
-		if so, run parse_final_level(level, pattern, text) and add result to the csv list
-		If not, we simply want to flatten this level into the next, then extract that data as the rows, with this parent data as associated properties of that final level csv item. 
-
-	check matches
-		is there no matches, return Return a list containing a single Generic Error CSVRow Object describing the error. Status Failed Matched and title “No Matches Found”
-	for match in matches: 
-		For the first match, Is there text data before it? Make that text a row with status Failed Match.
-		Is there text between the end of the span and the next match / or the end of the text-if no addl matches exists? capture that as a row with status failed match and append it to our csv_output
-	take current match and parse groups for data. Leave data fields Null when not extracted successfully. Create CSVRow Object using the below fields
-	*All csv rows have the following fields populated
-		- match_Index: <index in regex match list> 
-		- match_level: <Hierarchical level>
-		- csv_row_index: <row index in csv>   # Include row index only if Row will not be flattened. If it will, then do not append it to the output csv
-		- status: <Matched, Failed, Parent(to be unfolded)>
-		- ancestor_dict: {
-				<level>: (<Ancestor ID(level, match_index)>, <Ancestor Match Text>)}
-		- inherited_fields_dict: {		# Contains all fields extracted from ancestors, including most recent parent. Maintains group fields extracted from parents to be included in child object
-				<group_name>:<Extracted_Value>} 
-		- parent: <Higher Level Parent id (level, match_Index)> 
-		- parent_match_text: <pattern matched text retrieved from parent regex>
-		- span: <start and end indicies in the text>
-		- match_text: <regex text matching pattern>
-		* One of each of the group fields provided in regex pattern, all of which need to be inherited by the child
-		* IF Parent Item was provided as input, then use that to inform
-	
-	# If you encounter a critical error while extracting data, add a generic CSVRow Ojbect detailing the error to your csv_output, then return csv_output.	
-
-	# Once data has been parsed and CSVRow Object has been created for Parent Item, we want to take what rows we get from parsing the match text at subsequent child levels and append those output rows to our current csv_output list. We will not append the parent object we just created, we will just pass it in as an input to the parse function. The output is what we are adding to our csv_output list
-		with child_rows as parse_heirarchy(
-				text=text, 
-				pattern=regex_pattern_dict[str(starting_level+1)],
-				starting_level=starting_level+1, 
-				regex_pattern_dict=regex_pattern_dict, 
-				parent_csv_object=parent_csv_object
-			):
-			# Check if there are any successful matches with status=Matched. If not, then there was an error in parsing or no results, so change this Parent item’s status to Matched, append it to the csv_output, then append the error rows retrieved from the parse call.
-			# if there are matches, then we have successfully flattened this parent item and can add the parse output directly to the csv_output
-			if matches_exists: 
-				parent_csv_object.status = “Matched”
-			csv_output += child_rows
-		
-		# return csv_output collection once all matches have processed all of their descendants in each lower level and appended them to the collection
-		return csv_output
-
-def show_matches():
-# Show spans for each match highlighted with Parent data color coded according to parent level. All parent data of the same level should be highlighted the same color. If you run out of colors just start from the begging with the shading multiplied by some ratio within a span.Maybe lookup the name of the color for the legend. 
+A gym log ships as the bundled example, used when you don't supply your own patterns:
 
 ```
+# Tues, Oct 20, 2026          ->  DATE
+@ Chest                       ->  MUSCLE_GROUP
+- Bench Press: 40 LB D - 4 of 12 - ?   ->  EXERCISE_NAME, WEIGHT, SETS, REPS, EXERCISE_SKIP_FLAG
+```
 
-## TODO
-- Review: Should matching higher level text only match the target heading? And then pass in the text in between the headings, rather than the match text? --- recc'd because section-capturing patterns need a nested quantifier like `(?:\n[^#]*)+`, which is a catastrophic-backtracking shape that can hang on a near-miss — bad in a UI that re-matches on every keystroke. Header-only patterns are trivial one-liners and the body comes free from the offsets between consecutive headings. -claude
+## Install
+
+```sh
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Built and tested on Python 3.12. Two dependencies:
+
+- **`regex`** — not the stdlib `re`. The patterns use constructs `re` rejects.
+- **`pandas`** — for the DataFrame/CSV export.
+
+## Usage
+
+```sh
+.venv/bin/python rextract.py                                  # bundled gym example
+.venv/bin/python rextract.py log.txt -p my.patterns           # your own hierarchy
+.venv/bin/python rextract.py log.txt -o out/rows.csv
+.venv/bin/python rextract.py -c my.config.json                # everything from a config
+.venv/bin/python rextract.py log.txt -r 'pat1' -r 'pat2'      # patterns inline
+```
+
+| Flag | Meaning |
+|---|---|
+| `input` | Input text file. Default `data/input_data/input_small.txt` |
+| `-o`, `--output` | Output CSV. Default `data/output_data/gym_log.csv` |
+| `-p`, `--patterns` | Regex hierarchy file (see below) |
+| `-r`, `--regex` | One level's pattern inline; repeat once per level, in order |
+| `-c`, `--config` | JSON config bundling patterns, schema, input, output |
+| `-q`, `--quiet` | Skip the parse trail, print the summary only |
+| `--version` | Print version and exit |
+
+Exits `1` on a missing input, an invalid hierarchy, or an empty parse; `0` otherwise.
+
+## Supplying your own hierarchy
+
+Three ways, in order of precedence: **`-r` > `-p` > `--config` > the bundled gym example.**
+
+A complete worked example of a different hierarchy — host / service / log line — lives in
+[`examples/`](examples/), in all three formats.
+
+### A patterns file (`-p`)
+
+Any file that isn't `.json` is read as **one pattern per line, level 1 first**. Blank lines
+are ignored. Backslashes are literal, which is why this is usually the nicer format:
+
+```
+(?m)^==[ \t]*(?P<TARGET>(?P<HOST>[^\n]+?))[ \t]*(?:\n|$)
+(?m)^--[ \t]*(?P<TARGET>(?P<SERVICE>[^\n]+?))[ \t]*(?:\n|$)
+(?m)^\*[ \t]*(?P<TARGET>(?P<TIMESTAMP>[0-9-]+ [0-9:]+))[ \t]+(?P<SEVERITY>[A-Z]+)[ \t]+(?P<MESSAGE>[^\n]*?)[ \t]*(?:\n|$)
+```
+
+A `.json` file is read as `{level: pattern}` instead. JSON requires every backslash
+doubled (`\\t`, `\\n`), so prefer the line format unless you're generating the file.
+
+### A config file (`-c`)
+
+JSON, every key optional. Anything on the command line overrides it:
+
+```json
+{
+  "input": "logs/hosts.txt",
+  "output": "out/hosts.csv",
+  "patterns": { "1": "...", "2": "...", "3": "..." },
+  "schema": {
+    "columns": ["TIMESTAMP", "SEVERITY", "HOST", "SERVICE", "MESSAGE"],
+    "text": ["HOST", "SERVICE", "MESSAGE"]
+  }
+}
+```
+
+### Validation
+
+Levels must run `1..N` with no gaps — the parser finds the leaf level by looking for the
+next level up, so a gap would end the walk early. Each pattern must compile. Failures name
+the file and the level:
+
+```
+extract: my.patterns: levels must run 1..2 with no gaps, missing ['2'] (found ['1', '3'])
+extract: my.patterns: level 2 pattern does not compile: unterminated character set at position 20
+```
+
+## How it works
+
+### One pattern per level
+
+Level 1 matches the outermost sections; each deeper level is matched against the text
+between its parent's matches. The last level in the dict is automatically the leaf — the
+parser looks for `level + 1` to decide, which is why the levels have to be contiguous.
+
+Anchor header patterns with `(?m)^`. Unanchored, a stray delimiter inside a note reads as a
+new section and fabricates a bogus parent.
+
+### `TARGET` is the label for a match
+
+Each pattern should define a `TARGET` group. Its text becomes the node's `match_text` and is
+dropped from the exported fields (it would duplicate the named group nested inside it).
+With no `TARGET`, the first capture group is used.
+
+A match whose `TARGET` is empty — a bare `-`, a lone `-?` — is treated as a stub and
+produces no row.
+
+### Inheritance
+
+Each node builds its own copy of its ancestors' fields:
+
+```python
+self.inherited_fields_dict = {**parent.inherited_fields_dict, **parent.groups}
+```
+
+Copied, not shared. A single dict passed by reference down a depth-first walk accumulates
+across sibling branches, which silently gives rows the previous branch's values.
+
+### Unmatched text is kept
+
+Text the pattern can't place — before the first match, between two matches, or after the
+last — becomes an `ERROR` node holding the raw text and its span. `to_error_dataframe()`
+collects those separately so they never reach the export but also never disappear.
+
+### The parse trail
+
+Without `-q` the hierarchy is printed so you can read each row against where it came from.
+Custom patterns get the generic view, built from each node's `ancestor_dict`:
+
+```
+[1] prod-web-01
+  [2] nginx
+      2026-10-01 14:02   SEVERITY=ERROR  MESSAGE=502 upstream timeout
+      2026-10-01 14:05   SEVERITY=WARN  MESSAGE=slow response 3.2s
+  [2] postgres
+      2026-10-01 14:10   SEVERITY=ERROR  MESSAGE=deadlock detected
+
+------------------------------------------------------------
+5 rows parsed, 0 unmatched
+```
+
+The bundled gym example has a tailored view instead (`show_gym_rows`), with named columns
+and `~ SKIPPED` markers.
+
+## Output columns
+
+**With no schema**, every captured group becomes a text column, ordered by first
+appearance, whitespace stripped. Nothing is typed, because nothing can be assumed:
+
+```
+HOST,SERVICE,TIMESTAMP,SEVERITY,MESSAGE
+prod-web-01,nginx,2026-10-01 14:02,ERROR,502 upstream timeout
+```
+
+**With a schema**, you get column order and dtypes. The keys:
+
+| Key | Effect |
+|---|---|
+| `columns` | Fixes the column set and order. Groups not listed are dropped; names listed but never captured come through empty |
+| `text` | Columns to strip whitespace from |
+| `flags` | Presence-only markers (`!`, `?`, `skip`) collapsed to booleans |
+| `numeric` | Coerced to nullable `Int64` |
+| `date` | Parsed into a real date |
+
+`GYM_SCHEMA` in `rextract.py` is the worked example. It produces:
+
+| Column | Type | Notes |
+|---|---|---|
+| `DATE` | date | Parsed to ISO. Weekday discarded (`Tues` isn't a standard abbreviation) |
+| `MUSCLE_GROUP` | str | |
+| `EXERCISE_NAME` | str | |
+| `WEIGHT` | str | Free text — `40 LB D`, `12(max) resistance cable`, `Body weight` |
+| `SETS`, `REPS` | Int64 | Nullable — bodyweight entries have no count |
+| `EXC_PRIORITY_FLAG` | bool | The `!` marker |
+| `EXERCISE_SKIP_FLAG` | bool | The `?` marker |
+| `MG_SKIP_FLAG` | bool | `skip` after a `~` on the muscle-group line |
+| `EXERCISE_NOTES` | str | |
+
+`numeric` uses pandas' nullable `Int64`, not `int64` — a plain int can't hold missing
+values and would silently turn the column into floats (`4.0`).
+
+## Gym log format
+
+```
+# Wed, Oct 28, 2026                  date section
+**NOTE: anything here becomes DATE_NOTES
+
+@ Chest                              muscle group
+@ Bicep ~ skip                       muscle group, skipped
+- Bench Press: 40 LB D - 4 of 12 - did.    exercise with notes
+- Bench Press: 40 LB D - 4 of 12 - ?       exercise, skipped
+- ! Pull-ups:                              priority, no measurement
+- triceps extensions                       name only
+```
+
+`WEIGHT`, `SETS`/`REPS`, and the notes are each independently optional, so partial entries
+still produce a row rather than an error.
+
+## Known gaps
+
+- A parent whose only content is a stub (`@Hams` / `-?`) produces no rows at all, so it
+  vanishes from the output. Representing it needs a row emitted at the parent's level.
+- `show_matches()` is a stub — the span-highlighting view described in `DESIGN.md`.
+- Should higher-level patterns match only the heading, with bodies taken from the offsets
+  between consecutive headings? Section-capturing patterns need a nested quantifier like
+  `(?:\n[^#]*)+`, which is a catastrophic-backtracking shape that can hang on a near-miss —
+  bad in a UI that re-matches on every keystroke. Header-only patterns are trivial
+  one-liners and the body comes free from the offsets.
+
+Design notes and the original implementation spec are in `DESIGN.md`.

@@ -1,0 +1,10 @@
+== prod-web-01
+-- nginx
+* 2026-10-01 14:02 ERROR 502 upstream timeout
+* 2026-10-01 14:05 WARN slow response 3.2s
+-- postgres
+* 2026-10-01 14:10 ERROR deadlock detected
+== prod-web-02
+-- nginx
+* 2026-10-02 09:00 INFO reload complete
+* 2026-10-02 09:30 ERROR disk pressure
