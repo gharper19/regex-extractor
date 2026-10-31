@@ -213,10 +213,5 @@ still produce a row rather than an error.
 - A parent whose only content is a stub (`@Hams` / `-?`) produces no rows at all, so it
   vanishes from the output. Representing it needs a row emitted at the parent's level.
 - `show_matches()` is a stub — the span-highlighting view described in `DESIGN.md`.
-- Should higher-level patterns match only the heading, with bodies taken from the offsets
-  between consecutive headings? Section-capturing patterns need a nested quantifier like
-  `(?:\n[^#]*)+`, which is a catastrophic-backtracking shape that can hang on a near-miss —
-  bad in a UI that re-matches on every keystroke. Header-only patterns are trivial
-  one-liners and the body comes free from the offsets.
 
 Design notes and the original implementation spec are in `DESIGN.md`.
